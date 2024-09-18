@@ -1,0 +1,156 @@
+---
+  title: "Drivers for Health Research R&D"
+date: "September 18, 2024"
+author: "Asti Shafira"
+---
+  
+  #clear environment
+  rm(list = ls())
+
+# Load necessary libraries
+library(dplyr)
+
+## MERGING CLINICAL TRIALS DATA ##
+# Set the working directory to the folder containing the CSV files
+setwd("C:\\Users\\ashafira\\OneDrive - Center for Global Development\\Documents\\Health R&D\\Clinicaltrials.gov data")
+
+# List all CSV files in the directory
+ct_file_list <- list.files(pattern = "*.csv")
+# Function to read and label each CSV file
+ct_read_and_label <- function(file) {
+  df <- read.csv(file)
+  df$Source <- file  # Add a column to identify the source file
+  return(df)
+}
+# Read all CSV files into a list of data frames
+ct_df_list <- lapply(ct_file_list, ct_read_and_label)
+# Find all unique columns across all data frames
+ct_all_cols <- unique(unlist(lapply(ct_df_list, names)))
+# Function to add missing columns to a data frame
+ct_add_missing_columns <- function(df, all_cols) {
+  missing_cols <- setdiff(all_cols, names(df))
+  df[missing_cols] <- NA
+  return(df)
+}
+# Add missing columns to each data frame
+ct_df_list <- lapply(ct_df_list, ct_add_missing_columns, all_cols = ct_all_cols)
+# Combine all data frames into a single data frame
+ct <- do.call(rbind, ct_df_list)
+# View the combined clinical trials data frame
+View(ct)
+
+## Date Formatting ##
+# Convert date columns to date format
+install.packages("lubridate")
+library(lubridate)
+library(dplyr)
+# Function to clean date strings
+clean_date <- function(date_column) {
+  # Trim white space and replace any invalid characters (like slashes or commas) if needed
+  date_column <- gsub("[^0-9-/ ]", "", date_column)
+  date_column <- trimws(date_column) 
+  date_column <- ifelse(nchar(date_column) == 0, NA, date_column) 
+  return(date_column)
+}
+ct$Start.Date <- clean_date(df$Start.Date)
+ct$Primary.Completion.Date <- clean_date(df$Primary.Completion.Date)
+ct$Completion.Date <- clean_date(df$Completion.Date)
+ct$First.Posted <- clean_date(df$First.Posted)
+ct$Results.First.Posted <- clean_date(df$Results.First.Posted)
+ct$Last.Update.Posted <- clean_date(df$Last.Update.Posted)
+# Try parsing dates with multiple formats to ensure correct detection
+parse_multiple_formats <- function(date_column) {
+  parse_attempt <- dmy(date_column)  # Try day-month-year first
+  ifelse(is.na(parse_attempt), ymd(date_column), parse_attempt)  # If NA, try year-month-day
+}
+# Apply parsing function to each column
+ct$Start.Date <- parse_multiple_formats(df$Start.Date)
+ct$Primary.Completion.Date <- parse_multiple_formats(df$Primary.Completion.Date)
+ct$Completion.Date <- parse_multiple_formats(df$Completion.Date)
+ct$First.Posted <- parse_multiple_formats(df$First.Posted)
+ct$Results.First.Posted <- parse_multiple_formats(df$Results.First.Posted)
+ct$Last.Update.Posted <- parse_multiple_formats(df$Last.Update.Posted)
+# Check
+head(ct)
+
+# MANIPULATE CLINICAL TRIALS DATA #
+# Rename the "Enrollment" column to "n_patients"
+colnames(ct)[colnames(ct) == "Enrollment"] <- "n_patients"
+# Exporting the 'ct' to a CSV file
+write.csv(ct, "ct.csv", row.names = FALSE)
+# Change date format in Excel
+# Import the CSV file into a data frame
+ct_dated <- read.csv("C:\\Users\\ashafira\\OneDrive - Center for Global Development\\Documents\\Health R&D\\ct_dated.csv", stringsAsFactors = FALSE)
+ct_dated <- ct_dated[, !grepl("^X", names(ct_dated))]
+head(ct_dated)
+# Rename the column from "Source" to "disease"
+colnames(ct_dated)[colnames(ct_dated) == "Source"] <- "disease"
+ct_dated$disease <- gsub("\\.csv$", "", ct_dated$disease)
+
+
+# Exporting the 'ct_cleaned' to a CSV file
+write.csv(ct_dated, "ct_cleaned.csv", row.names = FALSE)
+
+# Pull specified columns
+ct_cleaned <- ct_dated[, c(
+  "Rank", "NCT.Number", "Status", "Study.Results", "Conditions", 
+  "Interventions", "Sponsor.Collaborators", "Gender", "Age", 
+  "Phases", "n_patients", "Funded.Bys", "Study.Type", 
+  "Start.Date", "Primary.Completion.Date", "Completion.Date", 
+  "First.Posted", "Results.First.Posted", "Last.Update.Posted", 
+  "Locations", "disease"
+)]
+# Check the structure of the new df
+str(ct_cleaned)
+
+## Create length of trials ##
+# Convert Start.Date and Completion.Date to Date type if they are not already
+ct_cleaned$Start.Date <- as.Date(ct_cleaned$Start.Date, format = "%m/%d/%Y")
+ct_cleaned$Completion.Date <- as.Date(ct_cleaned$Completion.Date, format = "%m/%d/%Y")
+# Calculate the length between Start.Date and Completion.Date in days
+ct_cleaned$MeanLength <- as.numeric(difftime(ct_cleaned$Completion.Date, ct_cleaned$Start.Date, units = "days"))
+# Calculate the length between Start.Date and Completion.Date in days
+ct_cleaned$MedLength <- apply(ct_cleaned[, c("Start.Date", "Completion.Date")], 1, function(x) {
+  median(as.numeric(difftime(as.Date(x["Completion.Date"]), as.Date(x["Start.Date"]), units = "days")))
+})
+# View the updated data
+head(ct_cleaned)
+
+## Create Phase of Trials columns ##
+# Create Alltr column (for every trial, assigning 1 to all entries)
+ct_cleaned$Alltr <- 1
+# Create P1p2p3 column (for all Phase 1, Phase 2, and Phase 3 trials including combinations)
+ct_cleaned$p1p2p3 <- ifelse(grepl("Phase 1|Phase 2|Phase 3", ct_cleaned$Phase), 1, 0) ## need confirmation
+# Create p1 column (for trials listed as Phase 1 and nothing else)
+ct_cleaned$p1 <- ifelse(ct_cleaned$Phase == "Phase 1", 1, 0)
+# Create p2 column (for trials listed as Phase 2 and nothing else)
+ct_cleaned$p2 <- ifelse(ct_cleaned$Phase == "Phase 2", 1, 0)
+# Create p3 column (for trials listed as Phase 3 and nothing else)
+ct_cleaned$p3 <- ifelse(ct_cleaned$Phase == "Phase 3", 1, 0)
+# Create p3 column (for trials listed as Phase 3 and nothing else)
+ct_cleaned$p4 <- ifelse(ct_cleaned$Phase == "Phase 4", 1, 0)
+## NEED CONFRIMATION ##
+# Create p1PLUS column (any trial that has a Phase 1 study, including combinations like Phase 1|Phase 2)
+ct_cleaned$p1PLUS <- ifelse(grepl("Phase 1", ct_cleaned$Phase), 1, 0)
+# Create p2PLUS column (any trial that has a Phase 2 study, including combinations like Phase 2|Phase 3)
+ct_cleaned$p2PLUS <- ifelse(grepl("Phase 2", ct_cleaned$Phase), 1, 0)
+# Create p3PLUS column (any trial that has a Phase 3 study, including combinations like Phase 3|Phase 4)
+ct_cleaned$p3PLUS <- ifelse(grepl("Phase 3", ct_cleaned$Phase), 1, 0)
+
+## Create Start Date modification columns ##
+# Convert Start.Date to a Date format if it's not already
+ct_cleaned$Start.Date <- as.Date(ct_cleaned$Start.Date, format="%Y-%m-%d")
+# Create allyr column (any trial starting in any year)
+ct_cleaned$allyr <- ifelse(!is.na(ct_cleaned$Start.Date), 1, 0)
+# Create 2005-09 column (trials starting between 2005 and 2009)
+ct_cleaned$`2005-09` <- ifelse(ct_cleaned$Start.Date >= as.Date("2005-01-01") & ct_cleaned$Start.Date <= as.Date("2009-12-31"), 1, 0)
+# Create 2010-14 column (trials starting between 2010 and 2014)
+ct_cleaned$`2010-14` <- ifelse(ct_cleaned$Start.Date >= as.Date("2010-01-01") & ct_cleaned$Start.Date <= as.Date("2014-12-31"), 1, 0)
+# Create 2015-19 column (trials starting between 2015 and 2019)
+ct_cleaned$`2015-19` <- ifelse(ct_cleaned$Start.Date >= as.Date("2015-01-01") & ct_cleaned$Start.Date <= as.Date("2019-12-31"), 1, 0)
+# Create 2020-24 column (trials starting between 2020 and 2024)
+ct_cleaned$`2020-24` <- ifelse(ct_cleaned$Start.Date >= as.Date("2020-01-01") & ct_cleaned$Start.Date <= as.Date("2024-12-31"), 1, 0)
+
+
+# Exporting the 'ct_cleaned' to a CSV file
+write.csv(ct_cleaned, "ct.csv", row.names = FALSE)
