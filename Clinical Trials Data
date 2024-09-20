@@ -108,11 +108,7 @@ str(ct_cleaned)
 ct_cleaned$Start.Date <- as.Date(ct_cleaned$Start.Date, format = "%m/%d/%Y")
 ct_cleaned$Completion.Date <- as.Date(ct_cleaned$Completion.Date, format = "%m/%d/%Y")
 # Calculate the length between Start.Date and Completion.Date in days
-ct_cleaned$MeanLength <- as.numeric(difftime(ct_cleaned$Completion.Date, ct_cleaned$Start.Date, units = "days"))
-# Calculate the length between Start.Date and Completion.Date in days
-ct_cleaned$MedLength <- apply(ct_cleaned[, c("Start.Date", "Completion.Date")], 1, function(x) {
-  median(as.numeric(difftime(as.Date(x["Completion.Date"]), as.Date(x["Start.Date"]), units = "days")))
-})
+ct_cleaned$length <- as.numeric(difftime(ct_cleaned$Completion.Date, ct_cleaned$Start.Date, units = "days"))
 # View the updated data
 head(ct_cleaned)
 
