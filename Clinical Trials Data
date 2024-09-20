@@ -117,39 +117,29 @@ ct_cleaned$MedLength <- apply(ct_cleaned[, c("Start.Date", "Completion.Date")], 
 head(ct_cleaned)
 
 ## Create Phase of Trials columns ##
+library(dplyr)
 # Create Alltr column (for every trial, assigning 1 to all entries)
-ct_cleaned$Alltr <- 1
-# Create P1p2p3 column (for all Phase 1, Phase 2, and Phase 3 trials including combinations)
-ct_cleaned$p1p2p3 <- ifelse(grepl("Phase 1|Phase 2|Phase 3", ct_cleaned$Phase), 1, 0) ## need confirmation
-# Create p1 column (for trials listed as Phase 1 and nothing else)
-ct_cleaned$p1 <- ifelse(ct_cleaned$Phase == "Phase 1", 1, 0)
-# Create p2 column (for trials listed as Phase 2 and nothing else)
-ct_cleaned$p2 <- ifelse(ct_cleaned$Phase == "Phase 2", 1, 0)
-# Create p3 column (for trials listed as Phase 3 and nothing else)
-ct_cleaned$p3 <- ifelse(ct_cleaned$Phase == "Phase 3", 1, 0)
-# Create p3 column (for trials listed as Phase 3 and nothing else)
-ct_cleaned$p4 <- ifelse(ct_cleaned$Phase == "Phase 4", 1, 0)
-## NEED CONFRIMATION ##
-# Create p1PLUS column (any trial that has a Phase 1 study, including combinations like Phase 1|Phase 2)
-ct_cleaned$p1PLUS <- ifelse(grepl("Phase 1", ct_cleaned$Phase), 1, 0)
-# Create p2PLUS column (any trial that has a Phase 2 study, including combinations like Phase 2|Phase 3)
-ct_cleaned$p2PLUS <- ifelse(grepl("Phase 2", ct_cleaned$Phase), 1, 0)
-# Create p3PLUS column (any trial that has a Phase 3 study, including combinations like Phase 3|Phase 4)
-ct_cleaned$p3PLUS <- ifelse(grepl("Phase 3", ct_cleaned$Phase), 1, 0)
-
-## Create Start Date modification columns ##
-# Convert Start.Date to a Date format if it's not already
-ct_cleaned$Start.Date <- as.Date(ct_cleaned$Start.Date, format="%Y-%m-%d")
-# Create allyr column (any trial starting in any year)
-ct_cleaned$allyr <- ifelse(!is.na(ct_cleaned$Start.Date), 1, 0)
-# Create 2005-09 column (trials starting between 2005 and 2009)
-ct_cleaned$`2005-09` <- ifelse(ct_cleaned$Start.Date >= as.Date("2005-01-01") & ct_cleaned$Start.Date <= as.Date("2009-12-31"), 1, 0)
-# Create 2010-14 column (trials starting between 2010 and 2014)
-ct_cleaned$`2010-14` <- ifelse(ct_cleaned$Start.Date >= as.Date("2010-01-01") & ct_cleaned$Start.Date <= as.Date("2014-12-31"), 1, 0)
-# Create 2015-19 column (trials starting between 2015 and 2019)
-ct_cleaned$`2015-19` <- ifelse(ct_cleaned$Start.Date >= as.Date("2015-01-01") & ct_cleaned$Start.Date <= as.Date("2019-12-31"), 1, 0)
-# Create 2020-24 column (trials starting between 2020 and 2024)
-ct_cleaned$`2020-24` <- ifelse(ct_cleaned$Start.Date >= as.Date("2020-01-01") & ct_cleaned$Start.Date <= as.Date("2024-12-31"), 1, 0)
+ct$Alltr <- 1
+# clean NA by create 'phase'
+ct <- ct %>%
+  mutate(phase = ifelse(Phases %in% c("Not Applicable", "", NA), NA, Phases))
+ct$phase <- ifelse(ct$Phases %in% c("Not Applicable", "", NA), NA, ct$Phases)
+unique(ct$phase)
+# Creating the new phases columns based on conditions
+ct <- ct %>%
+  mutate(
+    p1p2p3 = ifelse(is.na(phase), NA, 1),  # All non-NA are 1, NA remains NA
+    p1 = ifelse(phase == "Phase 1", 1, ifelse(is.na(phase), NA, 0)),  # ONLY "Phase 1" is 1, others are 0, NA remains NA
+    p2 = ifelse(phase == "Phase 2", 1, ifelse(is.na(phase), NA, 0)),  # ONLY "Phase 2" is 1, others are 0, NA remains NA
+    p3 = ifelse(phase == "Phase 3", 1, ifelse(is.na(phase), NA, 0)),  # ONLY "Phase 3" is 1, others are 0, NA remains NA
+    p4 = ifelse(phase == "Phase 4", 1, ifelse(is.na(phase), NA, 0)),  # ONLY "Phase 4" is 1, others are 0, NA remains NA
+    p1PLUS = ifelse(grepl("Phase 1", phase), 1, ifelse(is.na(phase), NA, 0)),  # "Phase 1", "Phase 1|Phase 2", and "Early Phase 1" are 1, others are 0, NA remains NA
+    p2PLUS = ifelse(grepl("Phase 2", phase), 1, ifelse(is.na(phase), NA, 0)),  # "Phase 2", "Phase 1|Phase 2", and "Phase 2|Phase 3" are 1, others are 0, NA remains NA
+    p3PLUS = ifelse(grepl("Phase 3", phase), 1, ifelse(is.na(phase), NA, 0))   # "Phase 3" and "Phase 2|Phase 3" are 1, others are 0, NA remains NA
+  )
+# Checking Phase by subset phase df
+phase <- ct[, c("Phases", "phase", "Alltr", "p1p2p3", "p1", "p2", "p3", "p4", "p1PLUS", "p2PLUS", "p3PLUS")]
+View(phase)
 
 
 # Exporting the 'ct_cleaned' to a CSV file
