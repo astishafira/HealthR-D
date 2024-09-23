@@ -137,6 +137,39 @@ ct <- ct %>%
 phase <- ct[, c("Phases", "phase", "Alltr", "p1p2p3", "p1", "p2", "p3", "p4", "p1PLUS", "p2PLUS", "p3PLUS")]
 View(phase)
 
+# Rename columns for consistency
+colnames(ct)[which(colnames(ct) == "MeanLength")] <- "length"
 
 # Exporting the 'ct_cleaned' to a CSV file
 write.csv(ct_cleaned, "ct.csv", row.names = FALSE)
+
+
+
+### AGGREGATING BY DISEASE ###
+# Create MeanLength and MidLength
+ct_aggregated <- ct %>%
+  group_by(disease) %>%
+  summarise(MeanLength = mean(length, na.rm = TRUE),
+            MedLength = median(length, na.rm = TRUE)) %>%
+  arrange(disease)
+
+# Create Phases, Years
+ct_aggregated <- ct %>%
+  group_by(disease) %>%
+  summarise(npatients = sum(n_patients, na.rm = TRUE), # Sum the number of patients
+            MeanLength = mean(length, na.rm = TRUE),
+            MedLength = median(length, na.rm = TRUE),
+            Alltr = n(),  # Count all trials for that disease
+            p1p2p3 = sum(p1p2p3 == 1, na.rm = TRUE),  # Count trials tagged as p1p2p3
+            p1 = sum(p1 == 1, na.rm = TRUE),  # Count trials tagged as p1
+            p2 = sum(p2 == 1, na.rm = TRUE),  # Count trials tagged as p2
+            p3 = sum(p3 == 1, na.rm = TRUE),  # Count trials tagged as p3
+            p4 = sum(p4 == 1, na.rm = TRUE),  # Count trials tagged as p4
+            p1PLUS = sum(p1PLUS == 1, na.rm = TRUE),  # Count trials tagged as p1PLUS
+            p2PLUS = sum(p2PLUS == 1, na.rm = TRUE),  # Count trials tagged as p2PLUS
+            p3PLUS = sum(p3PLUS == 1, na.rm = TRUE),
+            `2005-09` = sum(`2005-09` == 1, na.rm = TRUE),  # Count trials tagged as 2005-09
+            `2010-14` = sum(`2010-14` == 1, na.rm = TRUE),  # Count trials tagged as 2010-14
+            `2015-19` = sum(`2015-19` == 1, na.rm = TRUE),  # Count trials tagged as 2015-19
+            `2020-24` = sum(`2020-24` == 1, na.rm = TRUE)) %>%
+  arrange(disease)
